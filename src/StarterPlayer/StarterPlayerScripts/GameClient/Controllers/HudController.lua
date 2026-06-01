@@ -12,22 +12,35 @@ function HudController.Start()
 
 	local Remotes = require(ReplicatedStorage.Game.Shared.Remotes)
 	local Util = require(ReplicatedStorage.Game.Shared.Util)
+	local FoodRegistry = require(ReplicatedStorage.Game.Shared.Registries.FoodRegistry)
 
 	local player = Players.LocalPlayer
 	local gui = player:WaitForChild("PlayerGui"):WaitForChild("FridgeHudGui")
 
 	local rollButton = gui:WaitForChild("RollButton")
-	local feedButton = gui:WaitForChild("FeedButton")
 	local status = gui:WaitForChild("Status")
 	local inventoryList = gui:WaitForChild("InventoryList")
+	local inventoryPanel = inventoryList.Parent
+	local minimizeButton = gui:FindFirstChild("InventoryToggle", true)
 
 	local currentState = nil
-	local selectedInventoryIndex = nil
+	local inventoryCollapsed = false
 
 	local function setText(name, text)
 		local label = gui:FindFirstChild(name, true)
 		if label and label:IsA("TextLabel") then
 			label.Text = text
+		end
+	end
+
+	local function setInventoryCollapsed(collapsed)
+		inventoryCollapsed = collapsed
+		inventoryList.Visible = not collapsed
+		if minimizeButton and minimizeButton:IsA("TextButton") then
+			minimizeButton.Text = collapsed and "+" or "-"
+		end
+		if inventoryPanel and inventoryPanel:IsA("GuiObject") then
+			inventoryPanel.Size = collapsed and UDim2.new(0, 260, 0, 42) or UDim2.new(0, 260, 0, 380)
 		end
 	end
 
@@ -41,14 +54,24 @@ function HudController.Start()
 			return
 		end
 		for index, foodId in ipairs(currentState.inventory) do
+			local food = FoodRegistry.getFood(foodId)
 			local button = Instance.new("TextButton")
 			button.Name = "Food" .. index
-			button.Size = UDim2.new(1, -8, 0, 32)
-			button.Text = index .. ". " .. foodId
+			button.Size = UDim2.new(1, -8, 0, 42)
+			button.TextScaled = true
+			if food then
+				button.Text = index .. ". " .. food.displayName .. " | " .. food.rarity .. " | +" .. food.xp .. " XP"
+			else
+				button.Text = index .. ". " .. foodId
+			end
 			button.Parent = inventoryList
 			button.Activated:Connect(function()
-				selectedInventoryIndex = index
-				status.Text = "Selected " .. foodId .. " for feeding"
+				local ok, result = Remotes.EquipFoodRequested:InvokeServer(index)
+				if ok then
+					status.Text = "Equipped " .. result.displayName .. " (+" .. result.xp .. " XP). Press your Fridge to feed."
+				else
+					status.Text = tostring(result)
+				end
 			end)
 		end
 	end
@@ -61,9 +84,11 @@ function HudController.Start()
 	end
 
 	rollButton.Activated:Connect(function()
-		status.Text = "Rolling..."
 		local ok, result = Remotes.RollRequested:InvokeServer()
 		if not ok then
+			if result == "Cooldown" then
+				return
+			end
 			status.Text = tostring(result)
 			return
 		end
@@ -75,25 +100,18 @@ function HudController.Start()
 		end
 	end)
 
-	feedButton.Activated:Connect(function()
-		if not selectedInventoryIndex then
-			status.Text = "Select food first"
-			return
-		end
-		local ok, result = Remotes.FeedRequested:InvokeServer(selectedInventoryIndex)
-		if not ok then
-			status.Text = tostring(result)
-			return
-		end
-		status.Text = "Fed fridge"
-		selectedInventoryIndex = nil
-	end)
+	if minimizeButton and minimizeButton:IsA("TextButton") then
+		minimizeButton.Activated:Connect(function()
+			setInventoryCollapsed(not inventoryCollapsed)
+		end)
+	end
 
 	Remotes.StateChanged.OnClientEvent:Connect(render)
 	local initialState = Remotes.GetState:InvokeServer()
 	if initialState then
 		render(initialState)
 	end
+	setInventoryCollapsed(false)
 end
 
 return HudController
