@@ -19,8 +19,8 @@ function HudController.Start()
 
 	local rollButton = gui:WaitForChild("RollButton")
 	local status = gui:WaitForChild("Status")
-	local inventoryList = gui:WaitForChild("InventoryList")
-	local inventoryPanel = inventoryList.Parent
+	local inventoryPanel = gui:WaitForChild("InventoryPanel")
+	local inventoryList = inventoryPanel:WaitForChild("InventoryList")
 	local minimizeButton = gui:FindFirstChild("InventoryToggle", true)
 
 	local currentState = nil
@@ -68,7 +68,11 @@ function HudController.Start()
 			button.Activated:Connect(function()
 				local ok, result = Remotes.EquipFoodRequested:InvokeServer(index)
 				if ok then
-					status.Text = "Equipped " .. result.displayName .. " (+" .. result.xp .. " XP). Press your Fridge to feed."
+					status.Text = "Equipped "
+						.. result.displayName
+						.. " (+"
+						.. result.xp
+						.. " XP). Press your Fridge to feed."
 				else
 					status.Text = tostring(result)
 				end
@@ -94,7 +98,13 @@ function HudController.Start()
 		end
 		local chain = result.cloverChain or {}
 		if #chain > 0 then
-			status.Text = "Clover x" .. chain[#chain] .. " -> " .. result.food.displayName .. " (" .. result.rarity .. ")"
+			status.Text = "Clover x"
+				.. chain[#chain]
+				.. " -> "
+				.. result.food.displayName
+				.. " ("
+				.. result.rarity
+				.. ")"
 		else
 			status.Text = result.food.displayName .. " (" .. result.rarity .. ")"
 		end
