@@ -1,2 +1,5 @@
 print("Raise A Fridge client booting...")
-require(script.Controllers.HudController)
+
+local controllers = script.Parent:WaitForChild("Controllers")
+local hudController = controllers:WaitForChild("HudController")
+require(hudController)
