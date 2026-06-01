@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Balance = require(ReplicatedStorage.Game.Shared.Config.Balance)
 local FoodRegistry = require(ReplicatedStorage.Game.Shared.Registries.FoodRegistry)
@@ -31,6 +32,18 @@ local function createState()
 	}
 end
 
+local function getEquippedFoodTool(player)
+	local character = player.Character
+	if not character then
+		return nil
+	end
+	local tool = character:FindFirstChildOfClass("Tool")
+	if tool and tool:GetAttribute("IsFridgeFood") then
+		return tool
+	end
+	return nil
+end
+
 local function destroyFoodTools(player)
 	local character = player.Character
 	if character then
@@ -50,6 +63,63 @@ local function destroyFoodTools(player)
 	end
 end
 
+local function getFoodModelTemplate(foodId, food)
+	local serverFolder = ServerStorage:FindFirstChild("Game")
+		and ServerStorage.Game:FindFirstChild("Assets")
+		and ServerStorage.Game.Assets:FindFirstChild("FoodModels")
+	local replicatedFolder = ReplicatedStorage:FindFirstChild("Game")
+		and ReplicatedStorage.Game:FindFirstChild("Assets")
+		and ReplicatedStorage.Game.Assets:FindFirstChild("FoodModels")
+
+	if serverFolder then
+		local template = serverFolder:FindFirstChild(foodId) or serverFolder:FindFirstChild(food.displayName)
+		if template then
+			return template
+		end
+	end
+	if replicatedFolder then
+		local template = replicatedFolder:FindFirstChild(foodId) or replicatedFolder:FindFirstChild(food.displayName)
+		if template then
+			return template
+		end
+	end
+	return nil
+end
+
+local function prepareDescendant(instance)
+	if instance:IsA("BasePart") then
+		instance.CanCollide = false
+		instance.Massless = true
+	end
+end
+
+local function attachModelToHandle(model, handle)
+	for _, descendant in ipairs(model:GetDescendants()) do
+		prepareDescendant(descendant)
+	end
+	local primary = model:IsA("Model") and model.PrimaryPart or nil
+	if not primary then
+		primary = model:FindFirstChildWhichIsA("BasePart", true)
+	end
+	if primary then
+		primary.Name = "FoodVisualRoot"
+		primary.CFrame = handle.CFrame
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = handle
+		weld.Part1 = primary
+		weld.Parent = handle
+	end
+end
+
+local function createFallbackHandle()
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(1.4, 1.4, 1.4)
+	handle.CanCollide = false
+	handle.Massless = true
+	return handle
+end
+
 local function createFoodTool(foodId, food, inventoryIndex)
 	local tool = Instance.new("Tool")
 	tool.Name = food.displayName
@@ -61,12 +131,19 @@ local function createFoodTool(foodId, food, inventoryIndex)
 	tool:SetAttribute("Xp", food.xp)
 	tool.ToolTip = food.displayName .. " | " .. food.rarity .. " | +" .. food.xp .. " XP"
 
-	local handle = Instance.new("Part")
-	handle.Name = "Handle"
-	handle.Size = Vector3.new(1.4, 1.4, 1.4)
-	handle.CanCollide = false
-	handle.Massless = true
+	local handle = createFallbackHandle()
+	handle.Transparency = 1
 	handle.Parent = tool
+
+	local template = getFoodModelTemplate(foodId, food)
+	if template then
+		local visual = template:Clone()
+		visual.Name = "FoodVisual"
+		visual.Parent = tool
+		attachModelToHandle(visual, handle)
+	else
+		handle.Transparency = 0
+	end
 
 	return tool
 end
@@ -160,6 +237,16 @@ function StateService.equipFood(player, inventoryIndex)
 	local foodId = state.inventory[inventoryIndex]
 	if not foodId then
 		return false, "Invalid food"
+	end
+	local equippedTool = getEquippedFoodTool(player)
+	if equippedTool
+		and equippedTool:GetAttribute("InventoryIndex") == inventoryIndex
+		and equippedTool:GetAttribute("FoodId") == foodId then
+		equippedTool:Destroy()
+		return true, {
+			unequipped = true,
+			foodId = foodId,
+		}
 	end
 	local food = FoodRegistry.getFood(foodId)
 	if not food then
