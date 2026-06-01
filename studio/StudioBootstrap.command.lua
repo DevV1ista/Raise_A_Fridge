@@ -1,13 +1,35 @@
 -- TEMPORARY Studio bootstrap. Paste this once into Roblox Studio Command Bar, press Enter, save the place.
 -- This is only for initial placeholder UI/map. It can be deleted from the repo after the templates exist in Studio.
+-- Food tool visuals are read from ServerStorage.Game.Assets.FoodModels first,
+-- then ReplicatedStorage.Game.Assets.FoodModels as fallback.
+-- Name each model by FoodId, for example Toast, Apple, PizzaSlice, GoldenApple.
 
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
+local ServerStorage = game:GetService("ServerStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local existing = StarterGui:FindFirstChild("FridgeHudGui")
 if existing then
 	existing:Destroy()
 end
+
+local function ensurePath(root, names)
+	local current = root
+	for _, name in ipairs(names) do
+		local child = current:FindFirstChild(name)
+		if not child then
+			child = Instance.new("Folder")
+			child.Name = name
+			child.Parent = current
+		end
+		current = child
+	end
+	return current
+end
+
+ensurePath(ServerStorage, { "Game", "Assets", "FoodModels" })
+ensurePath(ReplicatedStorage, { "Game", "Assets", "FoodModels" })
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "FridgeHudGui"
