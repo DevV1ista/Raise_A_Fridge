@@ -26,9 +26,14 @@ local function equipFood(player, inventoryIndex)
 	return StateService.equipFood(player, inventoryIndex)
 end
 
+local function purchaseUpgrade(player, upgradeId)
+	return StateService.purchaseUpgrade(player, upgradeId)
+end
+
 Remotes.GetState.OnServerInvoke = getState
 Remotes.RollRequested.OnServerInvoke = roll
 Remotes.EquipFoodRequested.OnServerInvoke = equipFood
+Remotes.PurchaseUpgradeRequested.OnServerInvoke = purchaseUpgrade
 
 local accumulator = 0
 RunService.Heartbeat:Connect(function(deltaTime)
