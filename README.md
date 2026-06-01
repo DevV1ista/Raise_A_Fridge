@@ -27,6 +27,10 @@ Implemented foundation:
 - Skill tree effects for Rare/Epic unlocks, Luck, Money, XP and Clover cap.
 - DataStore persistence for Money, total earned, Fridge level/XP, Prestige, Inventory, Index and Skilltree.
 
+## Data Saving
+
+The server loads player data once on join and saves player data when the player leaves or when the server closes. Runtime changes only mark the profile dirty; they do not trigger frequent DataStore writes.
+
 ## Testing Data Saving
 
 Roblox Studio DataStores only work when API Services are enabled for the place. In Studio, enable **Game Settings > Security > Enable Studio Access to API Services** before testing persistence.
