@@ -1,5 +1,5 @@
--- Paste this once into Roblox Studio Command Bar, press Enter, save the place.
--- UI/map are intentionally Studio-owned so you can edit them freely.
+-- TEMPORARY Studio bootstrap. Paste this once into Roblox Studio Command Bar, press Enter, save the place.
+-- This is only for initial placeholder UI/map. It can be deleted from the repo after the templates exist in Studio.
 
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
@@ -34,9 +34,7 @@ local function label(name, text, x)
 end
 
 label("MoneyLabel", "$0", 16)
-label("FridgeLabel", "Fridge Lv. 1", 250)
-label("MpsLabel", "$5/s", 520)
-label("PrestigeLabel", "Prestige 0", 750)
+label("PrestigeLabel", "Prestige 0", 250)
 
 local roll = Instance.new("TextButton")
 roll.Name = "RollButton"
