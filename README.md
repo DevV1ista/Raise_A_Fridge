@@ -25,7 +25,12 @@ Implemented foundation:
 - Server-authoritative skill tree purchases.
 - Skill tree branches for Core, Luck, Clover, Income and Feeding.
 - Skill tree effects for Rare/Epic unlocks, Luck, Money, XP and Clover cap.
+- DataStore persistence for Money, total earned, Fridge level/XP, Prestige, Inventory, Index and Skilltree.
+
+## Testing Data Saving
+
+Roblox Studio DataStores only work when API Services are enabled for the place. In Studio, enable **Game Settings > Security > Enable Studio Access to API Services** before testing persistence.
 
 ## Next step
 
-MVP 2 continuation: improve the skill tree UI into a visual node graph with connector lines, then add simple data saving and stronger roll feedback.
+MVP 2 continuation: stronger roll feedback and dopamine animations, then better inventory/index UI.
