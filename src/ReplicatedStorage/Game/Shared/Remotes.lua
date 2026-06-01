@@ -31,7 +31,7 @@ end
 
 Remotes.StateChanged = getRemoteEvent("StateChanged")
 Remotes.RollRequested = getRemoteFunction("RollRequested")
-Remotes.FeedRequested = getRemoteFunction("FeedRequested")
+Remotes.EquipFoodRequested = getRemoteFunction("EquipFoodRequested")
 Remotes.GetState = getRemoteFunction("GetState")
 
 return Remotes
