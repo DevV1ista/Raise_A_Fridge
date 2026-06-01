@@ -44,30 +44,46 @@ roll.TextScaled = true
 roll.Text = "ROLL"
 roll.Parent = gui
 
-local feed = Instance.new("TextButton")
-feed.Name = "FeedButton"
-feed.Size = UDim2.new(0, 180, 0, 56)
-feed.Position = UDim2.new(1, -210, 1, -90)
-feed.TextScaled = true
-feed.Text = "FEED"
-feed.Parent = gui
-
 local status = Instance.new("TextLabel")
 status.Name = "Status"
-status.Size = UDim2.new(0, 520, 0, 48)
-status.Position = UDim2.new(0.5, -260, 1, -160)
+status.Size = UDim2.new(0, 620, 0, 48)
+status.Position = UDim2.new(0.5, -310, 1, -160)
 status.BackgroundTransparency = 0.25
 status.TextScaled = true
 status.Text = "Ready"
 status.Parent = gui
 
+local panel = Instance.new("Frame")
+panel.Name = "InventoryPanel"
+panel.Size = UDim2.new(0, 260, 0, 380)
+panel.Position = UDim2.new(1, -280, 0.5, -190)
+panel.BackgroundTransparency = 0.2
+panel.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.Name = "InventoryTitle"
+title.Size = UDim2.new(1, -48, 0, 36)
+title.Position = UDim2.new(0, 8, 0, 3)
+title.BackgroundTransparency = 1
+title.TextScaled = true
+title.Text = "Food Inventory"
+title.Parent = panel
+
+local toggle = Instance.new("TextButton")
+toggle.Name = "InventoryToggle"
+toggle.Size = UDim2.new(0, 34, 0, 34)
+toggle.Position = UDim2.new(1, -38, 0, 4)
+toggle.TextScaled = true
+toggle.Text = "-"
+toggle.Parent = panel
+
 local inv = Instance.new("ScrollingFrame")
 inv.Name = "InventoryList"
-inv.Size = UDim2.new(0, 260, 0, 340)
-inv.Position = UDim2.new(1, -280, 0.5, -170)
+inv.Size = UDim2.new(1, -12, 1, -48)
+inv.Position = UDim2.new(0, 6, 0, 44)
 inv.CanvasSize = UDim2.new(0, 0, 10, 0)
 inv.AutomaticCanvasSize = Enum.AutomaticSize.Y
-inv.Parent = gui
+inv.Parent = panel
 
 local layout = Instance.new("UIListLayout")
 layout.Padding = UDim.new(0, 6)
