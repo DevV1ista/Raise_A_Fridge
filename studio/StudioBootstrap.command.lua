@@ -51,8 +51,36 @@ local function label(parent, name, text, position, size)
 	l.BackgroundTransparency = 1
 	l.TextScaled = true
 	l.Text = text
+	l.TextColor3 = Color3.fromRGB(255, 255, 255)
+	l.TextStrokeTransparency = 0
+	l.Font = Enum.Font.GothamBlack
 	l.Parent = parent
 	return l
+end
+
+local function makeButton(parent, name, text, position, size)
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.Size = size
+	button.Position = position
+	button.TextScaled = true
+	button.Text = text
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.TextStrokeTransparency = 0
+	button.Font = Enum.Font.GothamBlack
+	button.BackgroundColor3 = Color3.fromRGB(30, 150, 255)
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = button
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(5, 8, 16)
+	stroke.Thickness = 3
+	stroke.Parent = button
+
+	return button
 end
 
 label(top, "MoneyLabel", "$0", UDim2.new(0, 16, 0, 0))
@@ -60,46 +88,28 @@ label(top, "PrestigeLabel", "Prestige 0", UDim2.new(0, 250, 0, 0))
 label(top, "MpsLabel", "$5/s", UDim2.new(0, 500, 0, 0))
 label(top, "MultiplierLabel", "XP x1.00 | Luck x1.00 | Clover x32", UDim2.new(0, 16, 0, 42), UDim2.new(0, 620, 0, 34))
 
-local roll = Instance.new("TextButton")
-roll.Name = "RollButton"
-roll.Size = UDim2.new(0, 260, 0, 72)
-roll.Position = UDim2.new(0.5, -130, 1, -100)
-roll.TextScaled = true
-roll.Text = "ROLL"
-roll.Parent = gui
+makeButton(gui, "SkillTreeButton", "SKILLS", UDim2.new(0.5, 150, 1, -100), UDim2.new(0, 180, 0, 72))
 
-local status = Instance.new("TextLabel")
-status.Name = "Status"
-status.Size = UDim2.new(0, 620, 0, 48)
-status.Position = UDim2.new(0.5, -310, 1, -160)
+local roll = makeButton(gui, "RollButton", "ROLL", UDim2.new(0.5, -130, 1, -100), UDim2.new(0, 260, 0, 72))
+roll.BackgroundColor3 = Color3.fromRGB(255, 185, 35)
+
+local status = label(gui, "Status", "Ready", UDim2.new(0.5, -310, 1, -160), UDim2.new(0, 620, 0, 48))
 status.BackgroundTransparency = 0.25
-status.TextScaled = true
-status.Text = "Ready"
-status.Parent = gui
+status.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 
 local panel = Instance.new("Frame")
 panel.Name = "InventoryPanel"
 panel.Size = UDim2.new(0, 260, 0, 380)
 panel.Position = UDim2.new(1, -280, 0.5, -190)
 panel.BackgroundTransparency = 0.2
+panel.BackgroundColor3 = Color3.fromRGB(16, 20, 30)
 panel.Parent = gui
 
-local title = Instance.new("TextLabel")
-title.Name = "InventoryTitle"
-title.Size = UDim2.new(1, -48, 0, 36)
-title.Position = UDim2.new(0, 8, 0, 3)
-title.BackgroundTransparency = 1
-title.TextScaled = true
-title.Text = "Food Inventory"
-title.Parent = panel
+local title = label(panel, "InventoryTitle", "Food Inventory", UDim2.new(0, 8, 0, 3), UDim2.new(1, -48, 0, 36))
+title.TextStrokeTransparency = 0.2
 
-local toggle = Instance.new("TextButton")
-toggle.Name = "InventoryToggle"
-toggle.Size = UDim2.new(0, 34, 0, 34)
-toggle.Position = UDim2.new(1, -38, 0, 4)
-toggle.TextScaled = true
-toggle.Text = "-"
-toggle.Parent = panel
+local toggle = makeButton(panel, "InventoryToggle", "-", UDim2.new(1, -38, 0, 4), UDim2.new(0, 34, 0, 34))
+toggle.BackgroundColor3 = Color3.fromRGB(50, 55, 75)
 
 local inv = Instance.new("ScrollingFrame")
 inv.Name = "InventoryList"
@@ -107,32 +117,39 @@ inv.Size = UDim2.new(1, -12, 1, -48)
 inv.Position = UDim2.new(0, 6, 0, 44)
 inv.CanvasSize = UDim2.new(0, 0, 10, 0)
 inv.AutomaticCanvasSize = Enum.AutomaticSize.Y
+inv.BackgroundTransparency = 1
 inv.Parent = panel
 
 local invLayout = Instance.new("UIListLayout")
 invLayout.Padding = UDim.new(0, 6)
 invLayout.Parent = inv
 
-local upgrades = Instance.new("Frame")
-upgrades.Name = "UpgradePanel"
-upgrades.Size = UDim2.new(0, 310, 0, 360)
-upgrades.Position = UDim2.new(0, 20, 0.5, -180)
-upgrades.BackgroundTransparency = 0.2
-upgrades.Parent = gui
+local overlay = Instance.new("Frame")
+overlay.Name = "SkillTreeOverlay"
+overlay.Size = UDim2.fromScale(1, 1)
+overlay.Position = UDim2.fromScale(0, 0)
+overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+overlay.BackgroundTransparency = 0.38
+overlay.Visible = false
+overlay.ZIndex = 50
+overlay.Parent = gui
 
-label(upgrades, "UpgradeTitle", "Upgrades", UDim2.new(0, 8, 0, 3), UDim2.new(1, -16, 0, 36))
+label(overlay, "SkillTreeMoneyLabel", "🪙 0", UDim2.new(0.5, -260, 0, 40), UDim2.new(0, 240, 0, 56)).ZIndex = 55
+label(overlay, "SkillTreeDiceLabel", "🎲 0", UDim2.new(0.5, 20, 0, 40), UDim2.new(0, 220, 0, 56)).ZIndex = 55
+local statusLabel = label(overlay, "SkillTreeStatusLabel", "Buy connected skills to unlock new paths", UDim2.new(0.5, -350, 1, -190), UDim2.new(0, 700, 0, 38))
+statusLabel.ZIndex = 55
+statusLabel.TextScaled = true
 
-local upgradeList = Instance.new("ScrollingFrame")
-upgradeList.Name = "UpgradeList"
-upgradeList.Size = UDim2.new(1, -12, 1, -48)
-upgradeList.Position = UDim2.new(0, 6, 0, 44)
-upgradeList.CanvasSize = UDim2.new(0, 0, 10, 0)
-upgradeList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-upgradeList.Parent = upgrades
+local canvas = Instance.new("Frame")
+canvas.Name = "SkillTreeCanvas"
+canvas.Size = UDim2.fromScale(1, 1)
+canvas.BackgroundTransparency = 1
+canvas.ZIndex = 51
+canvas.Parent = overlay
 
-local upgradeLayout = Instance.new("UIListLayout")
-upgradeLayout.Padding = UDim.new(0, 6)
-upgradeLayout.Parent = upgradeList
+local close = makeButton(overlay, "SkillTreeCloseButton", "CLOSE", UDim2.new(0.5, -125, 1, -92), UDim2.new(0, 250, 0, 72))
+close.BackgroundColor3 = Color3.fromRGB(255, 35, 35)
+close.ZIndex = 60
 
 local world = Workspace:FindFirstChild("RaiseAFridgeWorld") or Instance.new("Folder")
 world.Name = "RaiseAFridgeWorld"
