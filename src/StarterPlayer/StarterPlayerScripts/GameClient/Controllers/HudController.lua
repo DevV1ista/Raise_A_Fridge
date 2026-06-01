@@ -18,6 +18,7 @@ function HudController.Start()
 	local Remotes = require(ReplicatedStorage.Game.Shared.Remotes)
 	local Util = require(ReplicatedStorage.Game.Shared.Util)
 	local FoodRegistry = require(ReplicatedStorage.Game.Shared.Registries.FoodRegistry)
+	local UpgradeRegistry = require(ReplicatedStorage.Game.Shared.Registries.UpgradeRegistry)
 
 	local player = Players.LocalPlayer
 	local gui = player:WaitForChild("PlayerGui"):WaitForChild("FridgeHudGui")
@@ -27,6 +28,8 @@ function HudController.Start()
 	local inventoryPanel = gui:WaitForChild("InventoryPanel")
 	local inventoryList = inventoryPanel:WaitForChild("InventoryList")
 	local minimizeButton = gui:FindFirstChild("InventoryToggle", true)
+	local upgradePanel = gui:FindFirstChild("UpgradePanel", true)
+	local upgradeList = upgradePanel and upgradePanel:FindFirstChild("UpgradeList")
 
 	local currentState = nil
 	local inventoryCollapsed = false
@@ -85,11 +88,57 @@ function HudController.Start()
 		end
 	end
 
+	local function getUpgradeLine(upgradeId, upgrade)
+		local costText = upgrade.cost and "$" .. Util.formatNumber(upgrade.cost) or "MAX"
+		return upgrade.displayName .. " Lv. " .. upgrade.level .. "/" .. upgrade.maxLevel .. " | " .. costText
+	end
+
+	local function renderUpgrades()
+		if not upgradeList or not currentState or not currentState.upgrades then
+			return
+		end
+		for _, child in ipairs(upgradeList:GetChildren()) do
+			if child:IsA("TextButton") then
+				child:Destroy()
+			end
+		end
+		for _, upgradeId in ipairs(UpgradeRegistry.Order) do
+			local upgrade = currentState.upgrades[upgradeId]
+			if upgrade then
+				local button = Instance.new("TextButton")
+				button.Name = upgradeId .. "Button"
+				button.Size = UDim2.new(1, -8, 0, 54)
+				button.TextScaled = true
+				button.TextWrapped = true
+				button.Text = getUpgradeLine(upgradeId, upgrade)
+				button.Parent = upgradeList
+				button.Activated:Connect(function()
+					local ok, result = Remotes.PurchaseUpgradeRequested:InvokeServer(upgradeId)
+					if ok then
+						status.Text = upgrade.displayName .. " upgraded to Lv. " .. result.level
+					else
+						status.Text = tostring(result)
+					end
+				end)
+			end
+		end
+	end
+
 	local function render(state)
 		currentState = state
 		setText("MoneyLabel", "$" .. Util.formatNumber(state.money))
 		setText("PrestigeLabel", "Prestige " .. state.prestige)
+		setText("MpsLabel", "$" .. Util.formatNumber(state.moneyPerSecond) .. "/s")
+		if state.multipliers then
+			setText(
+				"MultiplierLabel",
+				"XP x" .. string.format("%.2f", state.multipliers.xp)
+					.. " | Luck x" .. string.format("%.2f", state.multipliers.luck)
+					.. " | Clover x" .. state.multipliers.cloverCap
+			)
+		end
 		renderInventory()
+		renderUpgrades()
 	end
 
 	rollButton.Activated:Connect(function()
