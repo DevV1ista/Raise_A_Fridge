@@ -31,14 +31,22 @@ local function createState()
 	}
 end
 
-local function destroyEquippedFoodTool(player)
+local function destroyFoodTools(player)
 	local character = player.Character
-	if not character then
-		return
+	if character then
+		for _, child in ipairs(character:GetChildren()) do
+			if child:IsA("Tool") and child:GetAttribute("IsFridgeFood") then
+				child:Destroy()
+			end
+		end
 	end
-	local tool = character:FindFirstChildOfClass("Tool")
-	if tool and tool:GetAttribute("IsFridgeFood") then
-		tool:Destroy()
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if backpack then
+		for _, child in ipairs(backpack:GetChildren()) do
+			if child:IsA("Tool") and child:GetAttribute("IsFridgeFood") then
+				child:Destroy()
+			end
+		end
 	end
 end
 
@@ -61,6 +69,24 @@ local function createFoodTool(foodId, food, inventoryIndex)
 	handle.Parent = tool
 
 	return tool
+end
+
+local function equipToolNow(player, tool)
+	local character = player.Character
+	if not character then
+		return false, "No character"
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return false, "No humanoid"
+	end
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if not backpack then
+		return false, "No backpack"
+	end
+	tool.Parent = backpack
+	humanoid:EquipTool(tool)
+	return true
 end
 
 function StateService.getFoodInfo(foodId)
@@ -139,13 +165,13 @@ function StateService.equipFood(player, inventoryIndex)
 	if not food then
 		return false, "Unknown food"
 	end
-	destroyEquippedFoodTool(player)
-	local backpack = player:FindFirstChildOfClass("Backpack")
-	if not backpack then
-		return false, "No backpack"
-	end
+	destroyFoodTools(player)
 	local tool = createFoodTool(foodId, food, inventoryIndex)
-	tool.Parent = backpack
+	local equipped, equipReason = equipToolNow(player, tool)
+	if not equipped then
+		tool:Destroy()
+		return false, equipReason
+	end
 	return true, {
 		foodId = foodId,
 		displayName = food.displayName,
