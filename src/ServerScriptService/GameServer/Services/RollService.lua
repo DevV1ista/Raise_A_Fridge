@@ -72,7 +72,7 @@ function RollService.roll(player)
 	end
 	local now = os.clock()
 	if now - state.lastRollAt < Balance.RollCooldownSeconds then
-		return false, "Rolling too fast"
+		return false, "Cooldown"
 	end
 	state.lastRollAt = now
 	local chain, cloverLuck = rollCloverChain()
