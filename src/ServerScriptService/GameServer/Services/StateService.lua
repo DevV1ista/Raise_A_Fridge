@@ -38,6 +38,11 @@ local function getUpgradeLevel(state, upgradeId)
 	return state.upgrades[upgradeId] or 0
 end
 
+local function refreshUnlockedRarities(state)
+	state.unlockedRarities = cloneUnlockedRarities()
+	UpgradeRegistry.applyUnlockEffects(state.upgrades, state.unlockedRarities)
+end
+
 local function getEquippedFoodTool(player)
 	local character = player.Character
 	if not character then
@@ -177,24 +182,19 @@ function StateService.getFoodInfo(foodId)
 end
 
 function StateService.getMoneyMultiplierFromState(state)
-	return 1 + getUpgradeLevel(state, "CoolerCompressor") * 0.08
+	return 1 + UpgradeRegistry.getTotalEffect(state.upgrades, "moneyMultiplierPerLevel")
 end
 
 function StateService.getXpMultiplierFromState(state)
-	return 1 + getUpgradeLevel(state, "FeedingFunnel") * 0.10
+	return 1 + UpgradeRegistry.getTotalEffect(state.upgrades, "xpMultiplierPerLevel")
 end
 
 function StateService.getLuckMultiplierFromState(state)
-	return 1 + getUpgradeLevel(state, "LuckyMagnet") * 0.12
+	return 1 + UpgradeRegistry.getTotalEffect(state.upgrades, "luckBonusPerLevel")
 end
 
 function StateService.getCloverCapFromState(state)
-	local cap = Balance.StartingCloverCap
-	local cloverLevel = getUpgradeLevel(state, "CloverFreezer")
-	for _ = 1, cloverLevel do
-		cap *= 2
-	end
-	return math.min(cap, 2048)
+	return math.min(Balance.StartingCloverCap * UpgradeRegistry.getCloverCapMultiplier(state.upgrades), 2048)
 end
 
 function StateService.getMoneyPerSecondFromState(state)
@@ -218,6 +218,8 @@ local function toPublicState(state)
 		inventory = state.inventory,
 		index = state.index,
 		upgrades = UpgradeRegistry.getPublicUpgrades(state.upgrades),
+		upgradeOrder = UpgradeRegistry.Order,
+		upgradeBranches = UpgradeRegistry.Branches,
 		unlockedRarities = state.unlockedRarities,
 		multipliers = {
 			money = StateService.getMoneyMultiplierFromState(state),
@@ -358,7 +360,10 @@ function StateService.purchaseUpgrade(player, upgradeId)
 	end
 	local upgrade = UpgradeRegistry.getUpgrade(upgradeId)
 	if not upgrade then
-		return false, "Unknown upgrade"
+		return false, "Unknown skill"
+	end
+	if not UpgradeRegistry.areRequirementsMet(upgradeId, state.upgrades) then
+		return false, "Locked: needs " .. UpgradeRegistry.getRequirementText(upgradeId)
 	end
 	local currentLevel = getUpgradeLevel(state, upgradeId)
 	if currentLevel >= upgrade.maxLevel then
@@ -366,16 +371,14 @@ function StateService.purchaseUpgrade(player, upgradeId)
 	end
 	local cost = UpgradeRegistry.getCost(upgradeId, currentLevel)
 	if not cost then
-		return false, "Invalid upgrade cost"
+		return false, "Invalid skill cost"
 	end
 	if state.money < cost then
 		return false, "Not enough money"
 	end
 	state.money -= cost
 	state.upgrades[upgradeId] = currentLevel + 1
-	if upgrade.effects.unlockRarity then
-		state.unlockedRarities[upgrade.effects.unlockRarity] = true
-	end
+	refreshUnlockedRarities(state)
 	StateService.pushState(player)
 	return true, {
 		upgradeId = upgradeId,
