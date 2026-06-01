@@ -31,6 +31,42 @@ local function createState()
 	}
 end
 
+local function destroyEquippedFoodTool(player)
+	local character = player.Character
+	if not character then
+		return
+	end
+	local tool = character:FindFirstChildOfClass("Tool")
+	if tool and tool:GetAttribute("IsFridgeFood") then
+		tool:Destroy()
+	end
+end
+
+local function createFoodTool(foodId, food, inventoryIndex)
+	local tool = Instance.new("Tool")
+	tool.Name = food.displayName
+	tool.RequiresHandle = true
+	tool.CanBeDropped = false
+	tool:SetAttribute("IsFridgeFood", true)
+	tool:SetAttribute("FoodId", foodId)
+	tool:SetAttribute("InventoryIndex", inventoryIndex)
+	tool:SetAttribute("Xp", food.xp)
+	tool.ToolTip = food.displayName .. " | " .. food.rarity .. " | +" .. food.xp .. " XP"
+
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(1.4, 1.4, 1.4)
+	handle.CanCollide = false
+	handle.Massless = true
+	handle.Parent = tool
+
+	return tool
+end
+
+function StateService.getFoodInfo(foodId)
+	return FoodRegistry.getFood(foodId)
+end
+
 function StateService.getMoneyPerSecondFromState(state)
 	return Balance.getMoneyPerSecond(state.fridgeLevel, {
 		prestige = Balance.getPrestigeMultiplier(state.prestige),
@@ -88,6 +124,59 @@ function StateService.addFood(player, foodId)
 	state.index[foodId] = (state.index[foodId] or 0) + 1
 	StateService.pushState(player)
 	return true
+end
+
+function StateService.equipFood(player, inventoryIndex)
+	local state = states[player]
+	if not state then
+		return false, "No state"
+	end
+	local foodId = state.inventory[inventoryIndex]
+	if not foodId then
+		return false, "Invalid food"
+	end
+	local food = FoodRegistry.getFood(foodId)
+	if not food then
+		return false, "Unknown food"
+	end
+	destroyEquippedFoodTool(player)
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if not backpack then
+		return false, "No backpack"
+	end
+	local tool = createFoodTool(foodId, food, inventoryIndex)
+	tool.Parent = backpack
+	return true, {
+		foodId = foodId,
+		displayName = food.displayName,
+		xp = food.xp,
+		rarity = food.rarity,
+	}
+end
+
+function StateService.feedEquippedFood(player)
+	local character = player.Character
+	if not character then
+		return false, "Equip food first"
+	end
+	local tool = character:FindFirstChildOfClass("Tool")
+	if not tool or not tool:GetAttribute("IsFridgeFood") then
+		return false, "Equip food first"
+	end
+	local inventoryIndex = tool:GetAttribute("InventoryIndex")
+	local state = states[player]
+	if not state or not inventoryIndex then
+		return false, "Invalid food"
+	end
+	local foodId = state.inventory[inventoryIndex]
+	if foodId ~= tool:GetAttribute("FoodId") then
+		return false, "Food changed"
+	end
+	local ok, result = StateService.feedFood(player, inventoryIndex)
+	if ok then
+		tool:Destroy()
+	end
+	return ok, result
 end
 
 function StateService.feedFood(player, inventoryIndex)
