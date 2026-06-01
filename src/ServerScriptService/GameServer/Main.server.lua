@@ -8,6 +8,9 @@ local PlotService = require(script.Parent.Services.PlotService)
 
 print("Raise A Fridge server booting...")
 
+PlotService.setFeedHandler(function(player)
+	StateService.feedEquippedFood(player)
+end)
 PlotService.Init()
 StateService.Init()
 
@@ -19,13 +22,13 @@ local function roll(player)
 	return RollService.roll(player)
 end
 
-local function feed(player, inventoryIndex)
-	return StateService.feedFood(player, inventoryIndex)
+local function equipFood(player, inventoryIndex)
+	return StateService.equipFood(player, inventoryIndex)
 end
 
 Remotes.GetState.OnServerInvoke = getState
 Remotes.RollRequested.OnServerInvoke = roll
-Remotes.FeedRequested.OnServerInvoke = feed
+Remotes.EquipFoodRequested.OnServerInvoke = equipFood
 
 local accumulator = 0
 RunService.Heartbeat:Connect(function(deltaTime)
