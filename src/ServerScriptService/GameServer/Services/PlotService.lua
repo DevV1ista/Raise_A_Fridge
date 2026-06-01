@@ -6,6 +6,7 @@ local Util = require(ReplicatedStorage.Game.Shared.Util)
 
 local PlotService = {}
 local assigned = {}
+local feedHandler = nil
 
 local function ensureWorld()
 	local world = Workspace:FindFirstChild("RaiseAFridgeWorld")
@@ -17,13 +18,24 @@ local function ensureWorld()
 	return world
 end
 
+local function makeLabel(parent, name, text, height)
+	local label = Instance.new("TextLabel")
+	label.Name = name
+	label.Size = UDim2.new(1, -12, 0, height or 24)
+	label.BackgroundTransparency = 1
+	label.TextScaled = true
+	label.Text = text
+	label.Parent = parent
+	return label
+end
+
 local function ensureFridgeBillboard(fridge)
 	local billboard = fridge:FindFirstChild("FridgeBillboard")
 	if not billboard then
 		billboard = Instance.new("BillboardGui")
 		billboard.Name = "FridgeBillboard"
-		billboard.Size = UDim2.new(0, 260, 0, 120)
-		billboard.StudsOffset = Vector3.new(0, 6.5, 0)
+		billboard.Size = UDim2.new(0, 280, 0, 150)
+		billboard.StudsOffset = Vector3.new(0, 7, 0)
 		billboard.AlwaysOnTop = true
 		billboard.MaxDistance = 90
 		billboard.Parent = fridge
@@ -40,23 +52,50 @@ local function ensureFridgeBillboard(fridge)
 		layout.VerticalAlignment = Enum.VerticalAlignment.Center
 		layout.Parent = holder
 
-		local function makeLabel(name, text)
-			local label = Instance.new("TextLabel")
-			label.Name = name
-			label.Size = UDim2.new(1, -12, 0, 26)
-			label.BackgroundTransparency = 1
-			label.TextScaled = true
-			label.Text = text
-			label.Parent = holder
-			return label
-		end
+		makeLabel(holder, "OwnerLabel", "Fridge", 24)
+		makeLabel(holder, "LevelLabel", "Level 1", 24)
+		makeLabel(holder, "MpsLabel", "$5/s", 24)
+		makeLabel(holder, "PrestigeLabel", "Prestige 0", 24)
+		makeLabel(holder, "XpLabel", "XP 0/25", 20)
 
-		makeLabel("OwnerLabel", "Fridge")
-		makeLabel("LevelLabel", "Level 1")
-		makeLabel("MpsLabel", "$5/s")
-		makeLabel("PrestigeLabel", "Prestige 0")
+		local barBack = Instance.new("Frame")
+		barBack.Name = "XpBarBack"
+		barBack.Size = UDim2.new(1, -24, 0, 14)
+		barBack.BackgroundTransparency = 0.15
+		barBack.Parent = holder
+
+		local barFill = Instance.new("Frame")
+		barFill.Name = "XpBarFill"
+		barFill.Size = UDim2.fromScale(0, 1)
+		barFill.BorderSizePixel = 0
+		barFill.Parent = barBack
 	end
 	return billboard
+end
+
+local function connectPrompt(plot, fridge)
+	local prompt = fridge:FindFirstChild("FeedPrompt")
+	if not prompt then
+		prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "FeedPrompt"
+		prompt.ActionText = "Feed equipped Food"
+		prompt.ObjectText = "Fridge"
+		prompt.HoldDuration = 0
+		prompt.RequiresLineOfSight = false
+		prompt.Parent = fridge
+	end
+	if prompt:GetAttribute("Connected") then
+		return
+	end
+	prompt:SetAttribute("Connected", true)
+	prompt.Triggered:Connect(function(player)
+		if plot:GetAttribute("OwnerUserId") ~= player.UserId then
+			return
+		end
+		if feedHandler then
+			feedHandler(player)
+		end
+	end)
 end
 
 local function createPlot(index)
@@ -79,6 +118,7 @@ local function createPlot(index)
 	fridge.Anchored = true
 	fridge.Parent = plot
 	ensureFridgeBillboard(fridge)
+	connectPrompt(plot, fridge)
 
 	return plot
 end
@@ -101,6 +141,10 @@ local function getAvailablePlot()
 	return nil
 end
 
+function PlotService.setFeedHandler(callback)
+	feedHandler = callback
+end
+
 function PlotService.getPlot(player)
 	return assigned[player]
 end
@@ -117,6 +161,7 @@ function PlotService.assign(player)
 	if fridge then
 		fridge:SetAttribute("OwnerName", player.Name)
 		ensureFridgeBillboard(fridge)
+		connectPrompt(plot, fridge)
 	end
 end
 
@@ -138,6 +183,9 @@ function PlotService.updateFridgeDisplay(player, state)
 	local levelLabel = holder:FindFirstChild("LevelLabel")
 	local mpsLabel = holder:FindFirstChild("MpsLabel")
 	local prestigeLabel = holder:FindFirstChild("PrestigeLabel")
+	local xpLabel = holder:FindFirstChild("XpLabel")
+	local xpBarBack = holder:FindFirstChild("XpBarBack")
+	local xpBarFill = xpBarBack and xpBarBack:FindFirstChild("XpBarFill")
 	if ownerLabel then
 		ownerLabel.Text = player.Name .. "'s Fridge"
 	end
@@ -149,6 +197,16 @@ function PlotService.updateFridgeDisplay(player, state)
 	end
 	if prestigeLabel then
 		prestigeLabel.Text = "Prestige " .. state.prestige
+	end
+	if xpLabel then
+		xpLabel.Text = "XP " .. math.floor(state.fridgeXp) .. "/" .. state.xpRequired
+	end
+	if xpBarFill then
+		local progress = 0
+		if state.xpRequired > 0 then
+			progress = math.clamp(state.fridgeXp / state.xpRequired, 0, 1)
+		end
+		xpBarFill.Size = UDim2.fromScale(progress, 1)
 	end
 end
 
