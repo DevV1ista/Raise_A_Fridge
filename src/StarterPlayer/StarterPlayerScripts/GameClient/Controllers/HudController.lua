@@ -1,5 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
 
 local HudController = {}
 local started = false
@@ -9,6 +10,10 @@ function HudController.Start()
 		return
 	end
 	started = true
+
+	pcall(function()
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	end)
 
 	local Remotes = require(ReplicatedStorage.Game.Shared.Remotes)
 	local Util = require(ReplicatedStorage.Game.Shared.Util)
@@ -68,11 +73,7 @@ function HudController.Start()
 			button.Activated:Connect(function()
 				local ok, result = Remotes.EquipFoodRequested:InvokeServer(index)
 				if ok then
-					status.Text = "Equipped "
-						.. result.displayName
-						.. " (+"
-						.. result.xp
-						.. " XP). Press your Fridge to feed."
+					status.Text = result.displayName .. " is now in your hand. Press your Fridge to feed."
 				else
 					status.Text = tostring(result)
 				end
