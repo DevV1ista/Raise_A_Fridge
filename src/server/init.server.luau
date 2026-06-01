@@ -1,1 +1,2 @@
-print("Hello world, from server!")
+-- Legacy Rojo template placeholder.
+-- Real server code lives in ServerScriptService.GameServer.
