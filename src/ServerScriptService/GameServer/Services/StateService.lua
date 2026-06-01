@@ -13,6 +13,7 @@ local StateService = {}
 local states = {}
 local dirty = {}
 local saving = {}
+local pendingSave = {}
 local shuttingDown = false
 
 local function cloneUnlockedRarities()
@@ -90,6 +91,16 @@ local function sanitizeUpgrades(source)
 	return result
 end
 
+local function countUpgrades(upgrades)
+	local count = 0
+	for _, level in pairs(upgrades) do
+		if level > 0 then
+			count += 1
+		end
+	end
+	return count
+end
+
 local function applyLoadedData(state, data)
 	if typeof(data) ~= "table" then
 		return
@@ -116,6 +127,7 @@ local function applyLoadedData(state, data)
 end
 
 local function serializeState(state)
+	local upgrades = sanitizeUpgrades(state.upgrades)
 	return {
 		money = state.money,
 		totalEarned = state.totalEarned,
@@ -124,12 +136,18 @@ local function serializeState(state)
 		prestige = state.prestige,
 		inventory = copyArray(state.inventory, Balance.InventoryLimit),
 		index = copyNumberMap(state.index),
-		upgrades = sanitizeUpgrades(state.upgrades),
+		upgrades = upgrades,
+		skillCount = countUpgrades(upgrades),
 	}
 end
 
 local function markDirty(player)
 	dirty[player] = true
+end
+
+local function requestSave(player)
+	markDirty(player)
+	pendingSave[player] = true
 end
 
 local function getEquippedFoodTool(player)
@@ -303,7 +321,6 @@ local function toPublicState(state)
 		fridgeXp = state.fridgeXp,
 		xpRequired = Balance.getXpRequiredForLevel(state.fridgeLevel),
 		moneyPerSecond = StateService.getMoneyPerSecondFromState(state),
-		prestage = state.prestige,
 		prestige = state.prestige,
 		inventory = state.inventory,
 		index = state.index,
@@ -346,19 +363,42 @@ function StateService.savePlayer(player, force)
 	if not state then
 		return false, "No state"
 	end
-	if saving[player] then
-		return false, "Already saving"
-	end
-	if not force and not dirty[player] then
+	if not force and not dirty[player] and not pendingSave[player] then
 		return true
 	end
+	local waited = 0
+	while saving[player] and waited < 10 do
+		task.wait(0.1)
+		waited += 0.1
+	end
+	if saving[player] then
+		pendingSave[player] = true
+		warn("[StateService] Save still running, queued another save for", player.UserId)
+		return false, "Save queued"
+	end
 	saving[player] = true
-	local ok, reason = DataService.Save(player, serializeState(state))
+	pendingSave[player] = nil
+	local data = serializeState(state)
+	local ok, reason = DataService.Save(player, data)
 	saving[player] = nil
 	if ok then
 		dirty[player] = nil
+		print("[StateService] Saved player", player.UserId, "level", state.fridgeLevel, "xp", math.floor(state.fridgeXp), "food", #state.inventory, "skills", data.skillCount)
+	else
+		dirty[player] = true
+		pendingSave[player] = true
+		warn("[StateService] Save failed for", player.UserId, reason)
 	end
 	return ok, reason
+end
+
+local function requestSaveSoon(player)
+	requestSave(player)
+	task.delay(2, function()
+		if states[player] then
+			StateService.savePlayer(player, false)
+		end
+	end)
 end
 
 function StateService.addFood(player, foodId)
@@ -371,7 +411,7 @@ function StateService.addFood(player, foodId)
 	end
 	table.insert(state.inventory, foodId)
 	state.index[foodId] = (state.index[foodId] or 0) + 1
-	markDirty(player)
+	requestSaveSoon(player)
 	StateService.pushState(player)
 	return true
 end
@@ -460,7 +500,7 @@ function StateService.feedFood(player, inventoryIndex)
 		state.fridgeLevel += 1
 		required = Balance.getXpRequiredForLevel(state.fridgeLevel)
 	end
-	markDirty(player)
+	requestSaveSoon(player)
 	StateService.pushState(player)
 	return true
 end
@@ -491,7 +531,7 @@ function StateService.purchaseUpgrade(player, upgradeId)
 	state.money -= cost
 	state.upgrades[upgradeId] = currentLevel + 1
 	refreshUnlockedRarities(state)
-	markDirty(player)
+	requestSaveSoon(player)
 	StateService.pushState(player)
 	return true, {
 		upgradeId = upgradeId,
@@ -514,9 +554,13 @@ local function loadPlayer(player)
 	local data = DataService.Load(player)
 	if data then
 		applyLoadedData(state, data)
+		print("[StateService] Loaded player", player.UserId, "level", state.fridgeLevel, "xp", math.floor(state.fridgeXp), "food", #state.inventory, "skills", countUpgrades(state.upgrades))
+	else
+		print("[StateService] Created new state for", player.UserId)
 	end
 	states[player] = state
 	dirty[player] = nil
+	pendingSave[player] = nil
 	StateService.pushState(player)
 end
 
@@ -527,13 +571,14 @@ function StateService.Init()
 		states[player] = nil
 		dirty[player] = nil
 		saving[player] = nil
+		pendingSave[player] = nil
 	end)
 	for _, player in ipairs(Players:GetPlayers()) do
 		loadPlayer(player)
 	end
 	task.spawn(function()
 		while not shuttingDown do
-			task.wait(60)
+			task.wait(30)
 			for player in pairs(states) do
 				StateService.savePlayer(player, false)
 			end
