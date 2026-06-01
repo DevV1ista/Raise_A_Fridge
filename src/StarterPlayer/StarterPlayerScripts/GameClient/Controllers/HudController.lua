@@ -73,7 +73,11 @@ function HudController.Start()
 			button.Activated:Connect(function()
 				local ok, result = Remotes.EquipFoodRequested:InvokeServer(index)
 				if ok then
-					status.Text = result.displayName .. " is now in your hand. Press your Fridge to feed."
+					if result.unequipped then
+						status.Text = "Food unequipped."
+					else
+						status.Text = result.displayName .. " is now in your hand. Press your Fridge to feed."
+					end
 				else
 					status.Text = tostring(result)
 				end
