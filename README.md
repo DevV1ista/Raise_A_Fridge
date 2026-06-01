@@ -22,9 +22,10 @@ Implemented foundation:
 - Money/sec from Fridge level.
 - Plot assignment and basic Fridge spawning.
 - Client UI controller that binds to Studio-created UI.
-- Server-authoritative upgrade purchases.
-- Upgrade effects for Rare unlocks, Luck, Money, XP and Clover cap.
+- Server-authoritative skill tree purchases.
+- Skill tree branches for Core, Luck, Clover, Income and Feeding.
+- Skill tree effects for Rare/Epic unlocks, Luck, Money, XP and Clover cap.
 
 ## Next step
 
-MVP 2 continuation: add Epic unlock progression, better upgrade requirements, simple data saving and stronger roll feedback.
+MVP 2 continuation: improve the skill tree UI into a visual node graph with connector lines, then add simple data saving and stronger roll feedback.
