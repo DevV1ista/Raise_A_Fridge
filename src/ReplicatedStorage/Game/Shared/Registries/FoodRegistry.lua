@@ -38,6 +38,11 @@ FoodRegistry.Foods = {
 	Steak = { displayName = "Steak", rarity = "Rare", xp = 120 },
 	Pancakes = { displayName = "Pancakes", rarity = "Rare", xp = 70 },
 	FrozenPizza = { displayName = "Frozen Pizza", rarity = "Rare", xp = 90 },
+
+	GalaxyBurger = { displayName = "Galaxy Burger", rarity = "Epic", xp = 260 },
+	CrystalSoda = { displayName = "Crystal Soda", rarity = "Epic", xp = 220 },
+	DragonFruitBowl = { displayName = "Dragon Fruit Bowl", rarity = "Epic", xp = 310 },
+	RoyalCake = { displayName = "Royal Cake", rarity = "Epic", xp = 340 },
 }
 
 function FoodRegistry.getFood(foodId)
