@@ -88,9 +88,20 @@ function HudController.Start()
 		end
 	end
 
-	local function getUpgradeLine(upgradeId, upgrade)
+	local function getSkillLine(upgrade)
 		local costText = upgrade.cost and "$" .. Util.formatNumber(upgrade.cost) or "MAX"
-		return upgrade.displayName .. " Lv. " .. upgrade.level .. "/" .. upgrade.maxLevel .. " | " .. costText
+		local lockText = upgrade.unlocked and "" or "LOCKED | "
+		return lockText .. upgrade.displayName .. " Lv. " .. upgrade.level .. "/" .. upgrade.maxLevel .. " | " .. costText
+	end
+
+	local function getSkillDescription(upgrade)
+		if upgrade.completed then
+			return "Completed"
+		end
+		if not upgrade.unlocked then
+			return "Needs: " .. upgrade.requirementText
+		end
+		return upgrade.description
 	end
 
 	local function renderUpgrades()
@@ -102,17 +113,24 @@ function HudController.Start()
 				child:Destroy()
 			end
 		end
-		for _, upgradeId in ipairs(UpgradeRegistry.Order) do
+		local order = currentState.upgradeOrder or UpgradeRegistry.Order
+		for _, upgradeId in ipairs(order) do
 			local upgrade = currentState.upgrades[upgradeId]
 			if upgrade then
 				local button = Instance.new("TextButton")
-				button.Name = upgradeId .. "Button"
-				button.Size = UDim2.new(1, -8, 0, 54)
+				button.Name = upgradeId .. "Node"
+				button.Size = UDim2.new(1, -8, 0, 68)
 				button.TextScaled = true
 				button.TextWrapped = true
-				button.Text = getUpgradeLine(upgradeId, upgrade)
+				button.AutoButtonColor = upgrade.unlocked and not upgrade.completed
+				button.TextTransparency = upgrade.unlocked and 0 or 0.35
+				button.Text = "[" .. upgrade.branch .. "] " .. getSkillLine(upgrade) .. "\n" .. getSkillDescription(upgrade)
 				button.Parent = upgradeList
 				button.Activated:Connect(function()
+					if not upgrade.unlocked then
+						status.Text = "Locked: needs " .. upgrade.requirementText
+						return
+					end
 					local ok, result = Remotes.PurchaseUpgradeRequested:InvokeServer(upgradeId)
 					if ok then
 						status.Text = upgrade.displayName .. " upgraded to Lv. " .. result.level
