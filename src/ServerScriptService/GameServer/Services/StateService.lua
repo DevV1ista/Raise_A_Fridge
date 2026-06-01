@@ -6,10 +6,14 @@ local Balance = require(ReplicatedStorage.Game.Shared.Config.Balance)
 local FoodRegistry = require(ReplicatedStorage.Game.Shared.Registries.FoodRegistry)
 local UpgradeRegistry = require(ReplicatedStorage.Game.Shared.Registries.UpgradeRegistry)
 local Remotes = require(ReplicatedStorage.Game.Shared.Remotes)
+local DataService = require(script.Parent.DataService)
 local PlotService = require(script.Parent.PlotService)
 
 local StateService = {}
 local states = {}
+local dirty = {}
+local saving = {}
+local shuttingDown = false
 
 local function cloneUnlockedRarities()
 	local unlocked = {}
@@ -41,6 +45,91 @@ end
 local function refreshUnlockedRarities(state)
 	state.unlockedRarities = cloneUnlockedRarities()
 	UpgradeRegistry.applyUnlockEffects(state.upgrades, state.unlockedRarities)
+end
+
+local function copyArray(source, limit)
+	local result = {}
+	if typeof(source) ~= "table" then
+		return result
+	end
+	for _, value in ipairs(source) do
+		if typeof(value) == "string" and FoodRegistry.getFood(value) then
+			table.insert(result, value)
+			if limit and #result >= limit then
+				break
+			end
+		end
+	end
+	return result
+end
+
+local function copyNumberMap(source)
+	local result = {}
+	if typeof(source) ~= "table" then
+		return result
+	end
+	for key, value in pairs(source) do
+		if typeof(key) == "string" and typeof(value) == "number" then
+			result[key] = math.max(0, math.floor(value))
+		end
+	end
+	return result
+end
+
+local function sanitizeUpgrades(source)
+	local result = {}
+	if typeof(source) ~= "table" then
+		return result
+	end
+	for upgradeId, value in pairs(source) do
+		local upgrade = UpgradeRegistry.getUpgrade(upgradeId)
+		if upgrade and typeof(value) == "number" then
+			result[upgradeId] = math.clamp(math.floor(value), 0, upgrade.maxLevel)
+		end
+	end
+	return result
+end
+
+local function applyLoadedData(state, data)
+	if typeof(data) ~= "table" then
+		return
+	end
+	if typeof(data.money) == "number" then
+		state.money = math.max(0, data.money)
+	end
+	if typeof(data.totalEarned) == "number" then
+		state.totalEarned = math.max(0, data.totalEarned)
+	end
+	if typeof(data.fridgeLevel) == "number" then
+		state.fridgeLevel = math.max(1, math.floor(data.fridgeLevel))
+	end
+	if typeof(data.fridgeXp) == "number" then
+		state.fridgeXp = math.max(0, data.fridgeXp)
+	end
+	if typeof(data.prestige) == "number" then
+		state.prestige = math.max(0, math.floor(data.prestige))
+	end
+	state.inventory = copyArray(data.inventory, Balance.InventoryLimit)
+	state.index = copyNumberMap(data.index)
+	state.upgrades = sanitizeUpgrades(data.upgrades)
+	refreshUnlockedRarities(state)
+end
+
+local function serializeState(state)
+	return {
+		money = state.money,
+		totalEarned = state.totalEarned,
+		fridgeLevel = state.fridgeLevel,
+		fridgeXp = state.fridgeXp,
+		prestige = state.prestige,
+		inventory = copyArray(state.inventory, Balance.InventoryLimit),
+		index = copyNumberMap(state.index),
+		upgrades = sanitizeUpgrades(state.upgrades),
+	}
+end
+
+local function markDirty(player)
+	dirty[player] = true
 end
 
 local function getEquippedFoodTool(player)
@@ -214,6 +303,7 @@ local function toPublicState(state)
 		fridgeXp = state.fridgeXp,
 		xpRequired = Balance.getXpRequiredForLevel(state.fridgeLevel),
 		moneyPerSecond = StateService.getMoneyPerSecondFromState(state),
+		prestage = state.prestige,
 		prestige = state.prestige,
 		inventory = state.inventory,
 		index = state.index,
@@ -251,6 +341,26 @@ function StateService.pushState(player)
 	Remotes.StateChanged:FireClient(player, publicState)
 end
 
+function StateService.savePlayer(player, force)
+	local state = states[player]
+	if not state then
+		return false, "No state"
+	end
+	if saving[player] then
+		return false, "Already saving"
+	end
+	if not force and not dirty[player] then
+		return true
+	end
+	saving[player] = true
+	local ok, reason = DataService.Save(player, serializeState(state))
+	saving[player] = nil
+	if ok then
+		dirty[player] = nil
+	end
+	return ok, reason
+end
+
 function StateService.addFood(player, foodId)
 	local state = states[player]
 	if not state then
@@ -261,6 +371,7 @@ function StateService.addFood(player, foodId)
 	end
 	table.insert(state.inventory, foodId)
 	state.index[foodId] = (state.index[foodId] or 0) + 1
+	markDirty(player)
 	StateService.pushState(player)
 	return true
 end
@@ -349,6 +460,7 @@ function StateService.feedFood(player, inventoryIndex)
 		state.fridgeLevel += 1
 		required = Balance.getXpRequiredForLevel(state.fridgeLevel)
 	end
+	markDirty(player)
 	StateService.pushState(player)
 	return true
 end
@@ -379,6 +491,7 @@ function StateService.purchaseUpgrade(player, upgradeId)
 	state.money -= cost
 	state.upgrades[upgradeId] = currentLevel + 1
 	refreshUnlockedRarities(state)
+	markDirty(player)
 	StateService.pushState(player)
 	return true, {
 		upgradeId = upgradeId,
@@ -391,22 +504,47 @@ function StateService.tickMoney(deltaTime)
 		local earned = StateService.getMoneyPerSecondFromState(state) * deltaTime
 		state.money += earned
 		state.totalEarned += earned
+		markDirty(player)
 		StateService.pushState(player)
 	end
 end
 
+local function loadPlayer(player)
+	local state = createState()
+	local data = DataService.Load(player)
+	if data then
+		applyLoadedData(state, data)
+	end
+	states[player] = state
+	dirty[player] = nil
+	StateService.pushState(player)
+end
+
 function StateService.Init()
-	Players.PlayerAdded:Connect(function(player)
-		states[player] = createState()
-		StateService.pushState(player)
-	end)
+	Players.PlayerAdded:Connect(loadPlayer)
 	Players.PlayerRemoving:Connect(function(player)
+		StateService.savePlayer(player, true)
 		states[player] = nil
+		dirty[player] = nil
+		saving[player] = nil
 	end)
 	for _, player in ipairs(Players:GetPlayers()) do
-		states[player] = createState()
-		StateService.pushState(player)
+		loadPlayer(player)
 	end
+	task.spawn(function()
+		while not shuttingDown do
+			task.wait(60)
+			for player in pairs(states) do
+				StateService.savePlayer(player, false)
+			end
+		end
+	end)
+	game:BindToClose(function()
+		shuttingDown = true
+		for player in pairs(states) do
+			StateService.savePlayer(player, true)
+		end
+	end)
 end
 
 return StateService
