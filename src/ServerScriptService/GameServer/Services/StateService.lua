@@ -4,6 +4,7 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local Balance = require(ReplicatedStorage.Game.Shared.Config.Balance)
 local FoodRegistry = require(ReplicatedStorage.Game.Shared.Registries.FoodRegistry)
+local UpgradeRegistry = require(ReplicatedStorage.Game.Shared.Registries.UpgradeRegistry)
 local Remotes = require(ReplicatedStorage.Game.Shared.Remotes)
 local PlotService = require(script.Parent.PlotService)
 
@@ -27,9 +28,14 @@ local function createState()
 		prestige = 0,
 		inventory = {},
 		index = {},
+		upgrades = {},
 		unlockedRarities = cloneUnlockedRarities(),
 		lastRollAt = 0,
 	}
+end
+
+local function getUpgradeLevel(state, upgradeId)
+	return state.upgrades[upgradeId] or 0
 end
 
 local function getEquippedFoodTool(player)
@@ -170,11 +176,32 @@ function StateService.getFoodInfo(foodId)
 	return FoodRegistry.getFood(foodId)
 end
 
+function StateService.getMoneyMultiplierFromState(state)
+	return 1 + getUpgradeLevel(state, "CoolerCompressor") * 0.08
+end
+
+function StateService.getXpMultiplierFromState(state)
+	return 1 + getUpgradeLevel(state, "FeedingFunnel") * 0.10
+end
+
+function StateService.getLuckMultiplierFromState(state)
+	return 1 + getUpgradeLevel(state, "LuckyMagnet") * 0.12
+end
+
+function StateService.getCloverCapFromState(state)
+	local cap = Balance.StartingCloverCap
+	local cloverLevel = getUpgradeLevel(state, "CloverFreezer")
+	for _ = 1, cloverLevel do
+		cap *= 2
+	end
+	return math.min(cap, 2048)
+end
+
 function StateService.getMoneyPerSecondFromState(state)
 	return Balance.getMoneyPerSecond(state.fridgeLevel, {
 		prestige = Balance.getPrestigeMultiplier(state.prestige),
 		permanent = 1,
-		upgrade = 1,
+		upgrade = StateService.getMoneyMultiplierFromState(state),
 		mutation = 1,
 	})
 end
@@ -190,7 +217,14 @@ local function toPublicState(state)
 		prestige = state.prestige,
 		inventory = state.inventory,
 		index = state.index,
+		upgrades = UpgradeRegistry.getPublicUpgrades(state.upgrades),
 		unlockedRarities = state.unlockedRarities,
+		multipliers = {
+			money = StateService.getMoneyMultiplierFromState(state),
+			xp = StateService.getXpMultiplierFromState(state),
+			luck = StateService.getLuckMultiplierFromState(state),
+			cloverCap = StateService.getCloverCapFromState(state),
+		},
 	}
 end
 
@@ -306,7 +340,7 @@ function StateService.feedFood(player, inventoryIndex)
 		return false, "Unknown food"
 	end
 	table.remove(state.inventory, inventoryIndex)
-	state.fridgeXp += food.xp
+	state.fridgeXp += food.xp * StateService.getXpMultiplierFromState(state)
 	local required = Balance.getXpRequiredForLevel(state.fridgeLevel)
 	while state.fridgeXp >= required do
 		state.fridgeXp -= required
@@ -315,6 +349,38 @@ function StateService.feedFood(player, inventoryIndex)
 	end
 	StateService.pushState(player)
 	return true
+end
+
+function StateService.purchaseUpgrade(player, upgradeId)
+	local state = states[player]
+	if not state then
+		return false, "No state"
+	end
+	local upgrade = UpgradeRegistry.getUpgrade(upgradeId)
+	if not upgrade then
+		return false, "Unknown upgrade"
+	end
+	local currentLevel = getUpgradeLevel(state, upgradeId)
+	if currentLevel >= upgrade.maxLevel then
+		return false, "Max level"
+	end
+	local cost = UpgradeRegistry.getCost(upgradeId, currentLevel)
+	if not cost then
+		return false, "Invalid upgrade cost"
+	end
+	if state.money < cost then
+		return false, "Not enough money"
+	end
+	state.money -= cost
+	state.upgrades[upgradeId] = currentLevel + 1
+	if upgrade.effects.unlockRarity then
+		state.unlockedRarities[upgrade.effects.unlockRarity] = true
+	end
+	StateService.pushState(player)
+	return true, {
+		upgradeId = upgradeId,
+		level = state.upgrades[upgradeId],
+	}
 end
 
 function StateService.tickMoney(deltaTime)
