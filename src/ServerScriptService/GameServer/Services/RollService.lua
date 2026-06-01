@@ -49,10 +49,9 @@ local function chooseFoodFromRarity(rarity)
 	return foods[rng:NextInteger(1, #foods)]
 end
 
-local function rollCloverChain()
+local function rollCloverChain(cap)
 	local chain = {}
 	local currentMultiplier = 1
-	local cap = Balance.StartingCloverCap
 	if rng:NextNumber() > Balance.BaseCloverStartChance then
 		return chain, currentMultiplier
 	end
@@ -75,8 +74,9 @@ function RollService.roll(player)
 		return false, "Cooldown"
 	end
 	state.lastRollAt = now
-	local chain, cloverLuck = rollCloverChain()
-	local totalLuck = cloverLuck
+	local cloverCap = StateService.getCloverCapFromState(state)
+	local chain, cloverLuck = rollCloverChain(cloverCap)
+	local totalLuck = cloverLuck * StateService.getLuckMultiplierFromState(state)
 	local rarity = chooseWeightedRarity(state, totalLuck)
 	local foodId = chooseFoodFromRarity(rarity)
 	local added, reason = StateService.addFood(player, foodId)
