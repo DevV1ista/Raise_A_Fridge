@@ -2,7 +2,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Balance = require(ReplicatedStorage.Game.Shared.Config.Balance)
 local FoodRegistry = require(ReplicatedStorage.Game.Shared.Registries.FoodRegistry)
-local PlayerDataService = require(script.Parent.PlayerDataService)
+local StateService = require(script.Parent.StateService)
 
 local RollService = {}
 local rng = Random.new()
@@ -66,7 +66,7 @@ local function rollCloverChain()
 end
 
 function RollService.roll(player)
-	local state = PlayerDataService.getState(player)
+	local state = StateService.getState(player)
 	if not state then
 		return false, "No state"
 	end
@@ -79,7 +79,7 @@ function RollService.roll(player)
 	local totalLuck = cloverLuck
 	local rarity = chooseWeightedRarity(state, totalLuck)
 	local foodId = chooseFoodFromRarity(rarity)
-	local added, reason = PlayerDataService.addFood(player, foodId)
+	local added, reason = StateService.addFood(player, foodId)
 	if not added then
 		return false, reason
 	end
