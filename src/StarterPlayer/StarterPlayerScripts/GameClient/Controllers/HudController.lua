@@ -47,8 +47,6 @@ end
 local function render(state)
 	currentState = state
 	setText("MoneyLabel", "$" .. Util.formatNumber(state.money))
-	setText("FridgeLabel", "Fridge Lv. " .. state.fridgeLevel .. " | XP " .. math.floor(state.fridgeXp) .. "/" .. state.xpRequired)
-	setText("MpsLabel", "$" .. Util.formatNumber(state.moneyPerSecond) .. "/s")
 	setText("PrestigeLabel", "Prestige " .. state.prestige)
 	renderInventory()
 end
