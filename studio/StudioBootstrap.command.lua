@@ -39,24 +39,26 @@ gui.Parent = StarterGui
 
 local top = Instance.new("Frame")
 top.Name = "TopBar"
-top.Size = UDim2.new(1, 0, 0, 64)
+top.Size = UDim2.new(1, 0, 0, 86)
 top.BackgroundTransparency = 0.2
 top.Parent = gui
 
-local function label(name, text, x)
+local function label(parent, name, text, position, size)
 	local l = Instance.new("TextLabel")
 	l.Name = name
-	l.Size = UDim2.new(0, 220, 1, 0)
-	l.Position = UDim2.new(0, x, 0, 0)
+	l.Size = size or UDim2.new(0, 220, 0, 34)
+	l.Position = position
 	l.BackgroundTransparency = 1
 	l.TextScaled = true
 	l.Text = text
-	l.Parent = top
+	l.Parent = parent
 	return l
 end
 
-label("MoneyLabel", "$0", 16)
-label("PrestigeLabel", "Prestige 0", 250)
+label(top, "MoneyLabel", "$0", UDim2.new(0, 16, 0, 0))
+label(top, "PrestigeLabel", "Prestige 0", UDim2.new(0, 250, 0, 0))
+label(top, "MpsLabel", "$5/s", UDim2.new(0, 500, 0, 0))
+label(top, "MultiplierLabel", "XP x1.00 | Luck x1.00 | Clover x32", UDim2.new(0, 16, 0, 42), UDim2.new(0, 620, 0, 34))
 
 local roll = Instance.new("TextButton")
 roll.Name = "RollButton"
@@ -107,9 +109,30 @@ inv.CanvasSize = UDim2.new(0, 0, 10, 0)
 inv.AutomaticCanvasSize = Enum.AutomaticSize.Y
 inv.Parent = panel
 
-local layout = Instance.new("UIListLayout")
-layout.Padding = UDim.new(0, 6)
-layout.Parent = inv
+local invLayout = Instance.new("UIListLayout")
+invLayout.Padding = UDim.new(0, 6)
+invLayout.Parent = inv
+
+local upgrades = Instance.new("Frame")
+upgrades.Name = "UpgradePanel"
+upgrades.Size = UDim2.new(0, 310, 0, 360)
+upgrades.Position = UDim2.new(0, 20, 0.5, -180)
+upgrades.BackgroundTransparency = 0.2
+upgrades.Parent = gui
+
+label(upgrades, "UpgradeTitle", "Upgrades", UDim2.new(0, 8, 0, 3), UDim2.new(1, -16, 0, 36))
+
+local upgradeList = Instance.new("ScrollingFrame")
+upgradeList.Name = "UpgradeList"
+upgradeList.Size = UDim2.new(1, -12, 1, -48)
+upgradeList.Position = UDim2.new(0, 6, 0, 44)
+upgradeList.CanvasSize = UDim2.new(0, 0, 10, 0)
+upgradeList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+upgradeList.Parent = upgrades
+
+local upgradeLayout = Instance.new("UIListLayout")
+upgradeLayout.Padding = UDim.new(0, 6)
+upgradeLayout.Parent = upgradeList
 
 local world = Workspace:FindFirstChild("RaiseAFridgeWorld") or Instance.new("Folder")
 world.Name = "RaiseAFridgeWorld"
