@@ -5,74 +5,10 @@ local TweenService = game:GetService("TweenService")
 local PrestigeController = {}
 local started = false
 
-local function createCorner(parent, radius)
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = radius or UDim.new(0, 12)
-	corner.Parent = parent
-	return corner
-end
-
-local function createStroke(parent, color, thickness)
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = color
-	stroke.Thickness = thickness or 2
-	stroke.Parent = parent
-	return stroke
-end
-
 local function tween(instance, tweenInfo, properties)
 	local createdTween = TweenService:Create(instance, tweenInfo, properties)
 	createdTween:Play()
 	return createdTween
-end
-
-local function getOrCreatePrestigeFrame(gui)
-	local existing = gui:FindFirstChild("PrestigeFrame", true)
-	if existing and existing:IsA("Frame") then
-		return existing
-	end
-
-	local frame = Instance.new("Frame")
-	frame.Name = "PrestigeFrame"
-	frame.AnchorPoint = Vector2.new(0.5, 1)
-	frame.Position = UDim2.new(0.5, 0, 1, -18)
-	frame.Size = UDim2.new(0, 370, 0, 78)
-	frame.BackgroundColor3 = Color3.fromRGB(14, 16, 26)
-	frame.BackgroundTransparency = 0.08
-	frame.BorderSizePixel = 0
-	frame.Parent = gui
-	createCorner(frame, UDim.new(0, 18))
-	createStroke(frame, Color3.fromRGB(255, 216, 90), 2)
-
-	local label = Instance.new("TextLabel")
-	label.Name = "PrestigeInfoLabel"
-	label.BackgroundTransparency = 1
-	label.Position = UDim2.new(0, 14, 0, 8)
-	label.Size = UDim2.new(1, -28, 0, 26)
-	label.Font = Enum.Font.GothamBold
-	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(255, 255, 255)
-	label.TextStrokeTransparency = 0.35
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Text = "Prestige unlocks at Fridge Lv. 25"
-	label.Parent = frame
-
-	local button = Instance.new("TextButton")
-	button.Name = "PrestigeButton"
-	button.Position = UDim2.new(0, 14, 0, 40)
-	button.Size = UDim2.new(1, -28, 0, 30)
-	button.BackgroundColor3 = Color3.fromRGB(95, 95, 105)
-	button.BorderSizePixel = 0
-	button.Font = Enum.Font.GothamBlack
-	button.TextScaled = true
-	button.TextColor3 = Color3.fromRGB(255, 255, 255)
-	button.TextStrokeTransparency = 0.15
-	button.Text = "Prestige locked"
-	button.AutoButtonColor = false
-	button.Parent = frame
-	createCorner(button, UDim.new(0, 12))
-
-	return frame
 end
 
 function PrestigeController.Start()
@@ -84,9 +20,19 @@ function PrestigeController.Start()
 	local Remotes = require(ReplicatedStorage.Game.Shared.Remotes)
 	local player = Players.LocalPlayer
 	local gui = player:WaitForChild("PlayerGui"):WaitForChild("FridgeHudGui")
-	local frame = getOrCreatePrestigeFrame(gui)
-	local label = frame:WaitForChild("PrestigeInfoLabel")
-	local button = frame:WaitForChild("PrestigeButton")
+	local frame = gui:FindFirstChild("PrestigeFrame", true)
+	if not frame or not frame:IsA("Frame") then
+		warn("[PrestigeController] Missing PrestigeFrame. Run the Studio command-bar setup script first.")
+		return
+	end
+
+	local label = frame:FindFirstChild("PrestigeInfoLabel", true)
+	local button = frame:FindFirstChild("PrestigeButton", true)
+	if not label or not label:IsA("TextLabel") or not button or not button:IsA("TextButton") then
+		warn("[PrestigeController] PrestigeFrame must contain PrestigeInfoLabel and PrestigeButton.")
+		return
+	end
+
 	local busy = false
 	local latestState = nil
 
