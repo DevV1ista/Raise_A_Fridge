@@ -30,10 +30,15 @@ local function purchaseUpgrade(player, upgradeId)
 	return StateService.purchaseUpgrade(player, upgradeId)
 end
 
+local function prestige(player)
+	return StateService.prestige(player)
+end
+
 Remotes.GetState.OnServerInvoke = getState
 Remotes.RollRequested.OnServerInvoke = roll
 Remotes.EquipFoodRequested.OnServerInvoke = equipFood
 Remotes.PurchaseUpgradeRequested.OnServerInvoke = purchaseUpgrade
+Remotes.PrestigeRequested.OnServerInvoke = prestige
 
 local accumulator = 0
 RunService.Heartbeat:Connect(function(deltaTime)
