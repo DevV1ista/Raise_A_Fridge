@@ -33,6 +33,7 @@ Remotes.StateChanged = getRemoteEvent("StateChanged")
 Remotes.RollRequested = getRemoteFunction("RollRequested")
 Remotes.EquipFoodRequested = getRemoteFunction("EquipFoodRequested")
 Remotes.PurchaseUpgradeRequested = getRemoteFunction("PurchaseUpgradeRequested")
+Remotes.PrestigeRequested = getRemoteFunction("PrestigeRequested")
 Remotes.GetState = getRemoteFunction("GetState")
 
 return Remotes
