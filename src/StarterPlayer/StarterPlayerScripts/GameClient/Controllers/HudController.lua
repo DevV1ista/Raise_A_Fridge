@@ -1,6 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
+local TweenService = game:GetService("TweenService")
 
 local HudController = {}
 local started = false
@@ -13,6 +14,36 @@ local COLUMN_GAP = 92
 local ROW_GAP = 82
 local BASE_COLUMN = 3
 local BASE_ROW = 3
+
+local RARITY_COLORS = {
+	Common = Color3.fromRGB(230, 230, 230),
+	Uncommon = Color3.fromRGB(90, 255, 120),
+	Rare = Color3.fromRGB(80, 170, 255),
+	Epic = Color3.fromRGB(190, 95, 255),
+	Legendary = Color3.fromRGB(255, 190, 55),
+	Mythic = Color3.fromRGB(255, 80, 120),
+	Secret = Color3.fromRGB(255, 255, 255),
+}
+
+local RARITY_PREFIX = {
+	Common = "Found",
+	Uncommon = "Nice",
+	Rare = "RARE",
+	Epic = "EPIC",
+	Legendary = "LEGENDARY",
+	Mythic = "MYTHIC",
+	Secret = "SECRET",
+}
+
+local function getRarityColor(rarity)
+	return RARITY_COLORS[rarity] or Color3.fromRGB(255, 255, 255)
+end
+
+local function tween(instance, tweenInfo, properties)
+	local createdTween = TweenService:Create(instance, tweenInfo, properties)
+	createdTween:Play()
+	return createdTween
+end
 
 function HudController.Start()
 	if started then
@@ -45,6 +76,10 @@ function HudController.Start()
 
 	local currentState = nil
 	local inventoryCollapsed = false
+	local rollSequence = 0
+	local rollButtonScale = rollButton:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	rollButtonScale.Scale = 1
+	rollButtonScale.Parent = rollButton
 
 	local function setText(name, text)
 		local label = gui:FindFirstChild(name, true)
@@ -70,6 +105,44 @@ function HudController.Start()
 		end
 	end
 
+	local function flashStatus(text, rarity, emphasis)
+		rollSequence += 1
+		local sequence = rollSequence
+		local rarityColor = getRarityColor(rarity)
+		status.Text = text
+		status.TextColor3 = rarityColor
+		status.TextStrokeTransparency = emphasis and 0 or 0.25
+		status.BackgroundTransparency = emphasis and 0.05 or 0.18
+		status.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
+		status.Size = emphasis and UDim2.new(0, 700, 0, 58) or UDim2.new(0, 620, 0, 48)
+		tween(status, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Size = UDim2.new(0, 620, 0, 48),
+			BackgroundTransparency = 0.25,
+		})
+		task.delay(1.6, function()
+			if sequence == rollSequence then
+				tween(status, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					TextColor3 = Color3.fromRGB(255, 255, 255),
+					TextStrokeTransparency = 0,
+				})
+			end
+		end)
+	end
+
+	local function pulseRollButton(rarity)
+		local emphasis = rarity == "Rare" or rarity == "Epic" or rarity == "Legendary" or rarity == "Mythic" or rarity == "Secret"
+		rollButton.BackgroundColor3 = getRarityColor(rarity)
+		rollButtonScale.Scale = emphasis and 1.18 or 1.08
+		tween(rollButtonScale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+		task.delay(0.45, function()
+			if rollButton and rollButton.Parent then
+				tween(rollButton, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					BackgroundColor3 = Color3.fromRGB(255, 185, 35),
+				})
+			end
+		end)
+	end
+
 	local function renderInventory()
 		for _, child in ipairs(inventoryList:GetChildren()) do
 			if child:IsA("TextButton") then
@@ -85,9 +158,15 @@ function HudController.Start()
 			button.Name = "Food" .. index
 			button.Size = UDim2.new(1, -8, 0, 42)
 			button.TextScaled = true
+			button.TextColor3 = Color3.fromRGB(255, 255, 255)
+			button.TextStrokeTransparency = 0
+			button.Font = Enum.Font.GothamBold
+			button.AutoButtonColor = true
 			if food then
+				button.BackgroundColor3 = getRarityColor(food.rarity)
 				button.Text = index .. ". " .. food.displayName .. " | " .. food.rarity .. " | +" .. food.xp .. " XP"
 			else
+				button.BackgroundColor3 = Color3.fromRGB(45, 50, 65)
 				button.Text = index .. ". " .. foodId
 			end
 			button.Parent = inventoryList
@@ -96,11 +175,13 @@ function HudController.Start()
 				if ok then
 					if result.unequipped then
 						status.Text = "Food unequipped."
+						status.TextColor3 = Color3.fromRGB(255, 255, 255)
 					else
-						status.Text = result.displayName .. " is now in your hand. Press your Fridge to feed."
+						flashStatus(result.displayName .. " is in your hand. Feed your Fridge!", result.rarity, false)
 					end
 				else
 					status.Text = tostring(result)
+					status.TextColor3 = Color3.fromRGB(255, 95, 95)
 				end
 			end)
 		end
@@ -378,20 +459,27 @@ function HudController.Start()
 				return
 			end
 			status.Text = tostring(result)
+			status.TextColor3 = Color3.fromRGB(255, 95, 95)
 			return
 		end
+
+		local rarity = result.rarity
+		local prefix = RARITY_PREFIX[rarity] or "Found"
+		local foodName = result.food.displayName
 		local chain = result.cloverChain or {}
+		local emphasis = rarity ~= "Common" and rarity ~= "Uncommon"
+		local message
 		if #chain > 0 then
-			status.Text = "Clover x"
-				.. chain[#chain]
-				.. " -> "
-				.. result.food.displayName
-				.. " ("
-				.. result.rarity
-				.. ")"
+			message = prefix .. "! Clover x" .. chain[#chain] .. " -> " .. foodName .. " (" .. rarity .. ")"
 		else
-			status.Text = result.food.displayName .. " (" .. result.rarity .. ")"
+			message = prefix .. "! " .. foodName .. " (" .. rarity .. ")"
 		end
+		if result.totalLuck and result.totalLuck > 1 then
+			message ..= " | Luck x" .. string.format("%.2f", result.totalLuck)
+		end
+
+		pulseRollButton(rarity)
+		flashStatus(message, rarity, emphasis)
 	end)
 
 	if minimizeButton and minimizeButton:IsA("TextButton") then
