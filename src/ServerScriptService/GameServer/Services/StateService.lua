@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Balance = require(ReplicatedStorage.Game.Shared.Config.Balance)
+local Prestige = require(ReplicatedStorage.Game.Shared.Config.Prestige)
 local RarityBonus = require(ReplicatedStorage.Game.Shared.Config.RarityBonus)
 local FoodRegistry = require(ReplicatedStorage.Game.Shared.Registries.FoodRegistry)
 local UpgradeRegistry = require(ReplicatedStorage.Game.Shared.Registries.UpgradeRegistry)
@@ -291,12 +292,20 @@ function StateService.getPermanentMultiplierFromState(state)
 	return RarityBonus.getTotalMultiplier(state.permanentBonus)
 end
 
+function StateService.getPrestigeMultiplierFromState(state)
+	return Prestige.getRewardMultiplier(state.prestige)
+end
+
 function StateService.getMoneyMultiplierFromState(state)
-	return StateService.getPermanentMultiplierFromState(state) * (1 + UpgradeRegistry.getTotalEffect(state.upgrades, "moneyMultiplierPerLevel"))
+	return StateService.getPrestigeMultiplierFromState(state)
+		* StateService.getPermanentMultiplierFromState(state)
+		* (1 + UpgradeRegistry.getTotalEffect(state.upgrades, "moneyMultiplierPerLevel"))
 end
 
 function StateService.getXpMultiplierFromState(state)
-	return StateService.getPermanentMultiplierFromState(state) * (1 + UpgradeRegistry.getTotalEffect(state.upgrades, "xpMultiplierPerLevel"))
+	return StateService.getPrestigeMultiplierFromState(state)
+		* StateService.getPermanentMultiplierFromState(state)
+		* (1 + UpgradeRegistry.getTotalEffect(state.upgrades, "xpMultiplierPerLevel"))
 end
 
 function StateService.getLuckMultiplierFromState(state)
@@ -309,7 +318,7 @@ end
 
 function StateService.getMoneyPerSecondFromState(state)
 	return Balance.getMoneyPerSecond(state.fridgeLevel, {
-		prestige = Balance.getPrestigeMultiplier(state.prestige),
+		prestige = StateService.getPrestigeMultiplierFromState(state),
 		permanent = StateService.getPermanentMultiplierFromState(state),
 		upgrade = 1 + UpgradeRegistry.getTotalEffect(state.upgrades, "moneyMultiplierPerLevel"),
 		mutation = 1,
@@ -317,6 +326,7 @@ function StateService.getMoneyPerSecondFromState(state)
 end
 
 local function toPublicState(state)
+	local nextPrestige = Prestige.getNextPreview(state.prestige)
 	return {
 		money = state.money,
 		totalEarned = state.totalEarned,
@@ -326,6 +336,9 @@ local function toPublicState(state)
 		moneyPerSecond = StateService.getMoneyPerSecondFromState(state),
 		prestige = state.prestige,
 		permanentBonus = state.permanentBonus,
+		prestigeRequirement = Prestige.RequiredFridgeLevel,
+		canPrestige = state.fridgeLevel >= Prestige.RequiredFridgeLevel,
+		nextPrestigeMultiplier = nextPrestige.multiplier,
 		inventory = state.inventory,
 		index = state.index,
 		upgrades = UpgradeRegistry.getPublicUpgrades(state.upgrades),
@@ -337,6 +350,7 @@ local function toPublicState(state)
 			xp = StateService.getXpMultiplierFromState(state),
 			luck = StateService.getLuckMultiplierFromState(state),
 			cloverCap = StateService.getCloverCapFromState(state),
+			prestige = StateService.getPrestigeMultiplierFromState(state),
 			permanent = StateService.getPermanentMultiplierFromState(state),
 		},
 	}
@@ -538,6 +552,32 @@ function StateService.purchaseUpgrade(player, upgradeId)
 	return true, {
 		upgradeId = upgradeId,
 		level = state.upgrades[upgradeId],
+	}
+end
+
+function StateService.prestige(player)
+	local state = states[player]
+	if not state then
+		return false, "No state"
+	end
+	if state.fridgeLevel < Prestige.RequiredFridgeLevel then
+		return false, "Prestige needs Fridge Level " .. Prestige.RequiredFridgeLevel
+	end
+	destroyFoodTools(player)
+	state.prestige += 1
+	state.money = 0
+	state.fridgeLevel = 1
+	state.fridgeXp = 0
+	state.inventory = {}
+	state.upgrades = {}
+	state.lastRollAt = 0
+	refreshUnlockedRarities(state)
+	markDirty(player)
+	StateService.pushState(player)
+	return true, {
+		prestige = state.prestige,
+		multiplier = StateService.getPrestigeMultiplierFromState(state),
+		permanentBonus = state.permanentBonus,
 	}
 end
 
