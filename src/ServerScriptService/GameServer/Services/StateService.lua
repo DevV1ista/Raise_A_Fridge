@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Balance = require(ReplicatedStorage.Game.Shared.Config.Balance)
+local RarityBonus = require(ReplicatedStorage.Game.Shared.Config.RarityBonus)
 local FoodRegistry = require(ReplicatedStorage.Game.Shared.Registries.FoodRegistry)
 local UpgradeRegistry = require(ReplicatedStorage.Game.Shared.Registries.UpgradeRegistry)
 local Remotes = require(ReplicatedStorage.Game.Shared.Remotes)
@@ -29,6 +30,7 @@ local function createState()
 		fridgeLevel = 1,
 		fridgeXp = 0,
 		prestige = 0,
+		permanentBonus = 0,
 		inventory = {},
 		index = {},
 		upgrades = {},
@@ -118,6 +120,9 @@ local function applyLoadedData(state, data)
 	if typeof(data.prestige) == "number" then
 		state.prestige = math.max(0, math.floor(data.prestige))
 	end
+	if typeof(data.permanentBonus) == "number" then
+		state.permanentBonus = math.max(0, data.permanentBonus)
+	end
 	state.inventory = copyArray(data.inventory, Balance.InventoryLimit)
 	state.index = copyNumberMap(data.index)
 	state.upgrades = sanitizeUpgrades(data.upgrades)
@@ -132,6 +137,7 @@ local function serializeState(state)
 		fridgeLevel = state.fridgeLevel,
 		fridgeXp = state.fridgeXp,
 		prestige = state.prestige,
+		permanentBonus = state.permanentBonus,
 		inventory = copyArray(state.inventory, Balance.InventoryLimit),
 		index = copyNumberMap(state.index),
 		upgrades = upgrades,
@@ -281,12 +287,16 @@ function StateService.getFoodInfo(foodId)
 	return FoodRegistry.getFood(foodId)
 end
 
+function StateService.getPermanentMultiplierFromState(state)
+	return RarityBonus.getTotalMultiplier(state.permanentBonus)
+end
+
 function StateService.getMoneyMultiplierFromState(state)
-	return 1 + UpgradeRegistry.getTotalEffect(state.upgrades, "moneyMultiplierPerLevel")
+	return StateService.getPermanentMultiplierFromState(state) * (1 + UpgradeRegistry.getTotalEffect(state.upgrades, "moneyMultiplierPerLevel"))
 end
 
 function StateService.getXpMultiplierFromState(state)
-	return 1 + UpgradeRegistry.getTotalEffect(state.upgrades, "xpMultiplierPerLevel")
+	return StateService.getPermanentMultiplierFromState(state) * (1 + UpgradeRegistry.getTotalEffect(state.upgrades, "xpMultiplierPerLevel"))
 end
 
 function StateService.getLuckMultiplierFromState(state)
@@ -300,8 +310,8 @@ end
 function StateService.getMoneyPerSecondFromState(state)
 	return Balance.getMoneyPerSecond(state.fridgeLevel, {
 		prestige = Balance.getPrestigeMultiplier(state.prestige),
-		permanent = 1,
-		upgrade = StateService.getMoneyMultiplierFromState(state),
+		permanent = StateService.getPermanentMultiplierFromState(state),
+		upgrade = 1 + UpgradeRegistry.getTotalEffect(state.upgrades, "moneyMultiplierPerLevel"),
 		mutation = 1,
 	})
 end
@@ -315,6 +325,7 @@ local function toPublicState(state)
 		xpRequired = Balance.getXpRequiredForLevel(state.fridgeLevel),
 		moneyPerSecond = StateService.getMoneyPerSecondFromState(state),
 		prestige = state.prestige,
+		permanentBonus = state.permanentBonus,
 		inventory = state.inventory,
 		index = state.index,
 		upgrades = UpgradeRegistry.getPublicUpgrades(state.upgrades),
@@ -326,6 +337,7 @@ local function toPublicState(state)
 			xp = StateService.getXpMultiplierFromState(state),
 			luck = StateService.getLuckMultiplierFromState(state),
 			cloverCap = StateService.getCloverCapFromState(state),
+			permanent = StateService.getPermanentMultiplierFromState(state),
 		},
 	}
 end
@@ -374,7 +386,7 @@ function StateService.savePlayer(player, force)
 	saving[player] = nil
 	if ok then
 		dirty[player] = nil
-		print("[StateService] Saved player", player.UserId, "level", state.fridgeLevel, "xp", math.floor(state.fridgeXp), "food", #state.inventory, "skills", data.skillCount)
+		print("[StateService] Saved player", player.UserId, "level", state.fridgeLevel, "xp", math.floor(state.fridgeXp), "food", #state.inventory, "skills", data.skillCount, "permanentBonus", state.permanentBonus)
 	else
 		dirty[player] = true
 		warn("[StateService] Save failed for", player.UserId, reason)
@@ -474,6 +486,10 @@ function StateService.feedFood(player, inventoryIndex)
 		return false, "Unknown food"
 	end
 	table.remove(state.inventory, inventoryIndex)
+	local rarityBonus = RarityBonus.getBonusForRarity(food.rarity)
+	if rarityBonus > 0 then
+		state.permanentBonus += rarityBonus
+	end
 	state.fridgeXp += food.xp * StateService.getXpMultiplierFromState(state)
 	local required = Balance.getXpRequiredForLevel(state.fridgeLevel)
 	while state.fridgeXp >= required do
@@ -483,7 +499,12 @@ function StateService.feedFood(player, inventoryIndex)
 	end
 	markDirty(player)
 	StateService.pushState(player)
-	return true
+	return true, {
+		foodId = foodId,
+		rarity = food.rarity,
+		permanentBonusAdded = rarityBonus,
+		permanentBonus = state.permanentBonus,
+	}
 end
 
 function StateService.purchaseUpgrade(player, upgradeId)
@@ -535,7 +556,7 @@ local function loadPlayer(player)
 	local data = DataService.Load(player)
 	if data then
 		applyLoadedData(state, data)
-		print("[StateService] Loaded player", player.UserId, "level", state.fridgeLevel, "xp", math.floor(state.fridgeXp), "food", #state.inventory, "skills", countUpgrades(state.upgrades))
+		print("[StateService] Loaded player", player.UserId, "level", state.fridgeLevel, "xp", math.floor(state.fridgeXp), "food", #state.inventory, "skills", countUpgrades(state.upgrades), "permanentBonus", state.permanentBonus)
 	else
 		print("[StateService] Created new state for", player.UserId)
 	end
