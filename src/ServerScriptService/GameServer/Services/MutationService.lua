@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local MutationConfig = require(ReplicatedStorage.Game.Shared.Config.MutationConfig)
+local MutationRemotes = require(ReplicatedStorage.Game.Shared.Remotes.MutationRemotes)
 
 local MutationService = {}
 
@@ -29,6 +30,25 @@ local function getWeightedMutation()
 	return MutationConfig.Definitions.DoubleMoney
 end
 
+function MutationService:_replicateMutation(player, mutationState)
+	local remote = MutationRemotes:GetMutationChangedRemote()
+
+	if not mutationState then
+		remote:FireClient(player, nil)
+		return
+	end
+
+	remote:FireClient(player, {
+		Id = mutationState.Definition.Id,
+		DisplayName = mutationState.Definition.DisplayName,
+		Description = mutationState.Definition.Description,
+		StartTime = mutationState.StartTime,
+		EndTime = mutationState.EndTime,
+		MoneyMultiplier = mutationState.Definition.MoneyMultiplier,
+		XpMultiplier = mutationState.Definition.XpMultiplier,
+	})
+end
+
 function MutationService:GetActiveMutation(player)
 	local state = self._playerMutations[player]
 
@@ -38,6 +58,7 @@ function MutationService:GetActiveMutation(player)
 
 	if os.time() >= state.EndTime then
 		self._playerMutations[player] = nil
+		self:_replicateMutation(player, nil)
 		return nil
 	end
 
@@ -78,6 +99,7 @@ function MutationService:TryRollMutation(player)
 	}
 
 	self._playerMutations[player] = mutationState
+	self:_replicateMutation(player, mutationState)
 
 	return mutationState
 end
@@ -103,7 +125,10 @@ function MutationService:Start()
 
 	self._started = true
 
+	MutationRemotes:GetMutationChangedRemote()
+
 	Players.PlayerAdded:Connect(function(player)
+		self:_replicateMutation(player, nil)
 		self:_startPlayerLoop(player)
 	end)
 
@@ -112,6 +137,7 @@ function MutationService:Start()
 	end)
 
 	for _, player in Players:GetPlayers() do
+		self:_replicateMutation(player, nil)
 		self:_startPlayerLoop(player)
 	end
 end
